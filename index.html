@@ -1,0 +1,1131 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CubiMonde</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#111;font-family:system-ui,sans-serif;color:#fff;user-select:none}
+canvas#jeu{position:fixed;inset:0;width:100%;height:100%;display:block}
+.ecran{position:fixed;inset:0;display:none;overflow:auto;z-index:10;background:rgba(10,14,24,.72)}
+.ecran.visible{display:flex}
+#menu{background:linear-gradient(#6fb7ff 0%,#bfe3ff 55%,#5da845 55%,#3f7d30 62%,#7a5232 62%,#4d321e 100%)}
+.boite{margin:auto;width:min(560px,94vw);background:#1d2233ee;border:4px solid #000;box-shadow:inset 0 0 0 3px #4b5578,0 20px 50px #0008;padding:22px;text-align:center}
+h1{font:900 clamp(34px,9vw,60px)/1 ui-monospace,monospace;letter-spacing:2px;color:#ffe66d;text-shadow:4px 4px 0 #7a4b12;margin-bottom:6px}
+h2{margin-bottom:12px}
+h3{font-size:13px;text-transform:uppercase;letter-spacing:2px;opacity:.75;margin:14px 0 6px;text-align:left}
+.choix{display:flex;gap:8px}
+button{flex:1;font:700 15px system-ui;color:#fff;background:#5a6180;border:3px solid #000;box-shadow:inset 2px 2px 0 #ffffff44,inset -2px -2px 0 #0006;padding:11px 8px;cursor:pointer}
+button:hover{background:#6d76a0}
+button.actif{background:#3f9142;outline:3px solid #ffe66d;outline-offset:-1px}
+button.grand{display:block;width:100%;margin-top:10px;font-size:18px}
+button.vert{background:#3f9142}
+input{width:100%;min-width:0;padding:10px;font:600 15px system-ui;background:#0d101a;color:#fff;border:3px solid #000}
+.petit{font-size:13px;line-height:1.7;opacity:.85;margin-top:12px}
+kbd{background:#000;border:1px solid #888;border-radius:3px;padding:0 5px;font-size:12px}
+#etat{min-height:20px;color:#ffd166;margin-top:10px;font-size:14px}
+#hud{display:none;position:fixed;inset:0;pointer-events:none;z-index:5}
+#viseur{position:absolute;left:50%;top:50%;width:22px;height:22px;margin:-11px;mix-blend-mode:difference;background:linear-gradient(#fff,#fff) center/100% 2px no-repeat,linear-gradient(#fff,#fff) center/2px 100% no-repeat}
+#bas{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:5px}
+#barre{display:flex;background:#0008;border:3px solid #000;pointer-events:auto}
+.case{position:relative;width:min(52px,10.4vw);aspect-ratio:1;border:3px solid #777;background:#0004;cursor:pointer}
+.case.actif{border-color:#fff;background:#fff3}
+.case canvas{position:absolute;inset:8%;width:84%;height:84%;image-rendering:pixelated}
+.case span{position:absolute;right:2px;bottom:0;font:800 13px monospace;text-shadow:2px 2px 0 #000}
+#vie,#air{font-size:19px;letter-spacing:1px;text-shadow:2px 2px 0 #000;min-height:22px}
+#nom{font-weight:700;text-shadow:2px 2px 0 #000;min-height:20px}
+#infos{position:absolute;left:10px;top:8px;font:600 13px/1.5 monospace;text-shadow:1px 1px 2px #000;white-space:pre}
+#message{position:absolute;top:18%;width:100%;text-align:center;font-weight:700;text-shadow:2px 2px 0 #000}
+#progres{position:absolute;left:50%;top:calc(50% + 20px);width:60px;height:6px;margin-left:-30px;background:#0008;display:none}
+#progres i{display:block;height:100%;background:#7dff7d}
+#flash{position:absolute;inset:0;background:#f00;opacity:0;transition:opacity .4s}
+#eau{position:absolute;inset:0;background:#1450c866;display:none}
+.etiquette{position:absolute;transform:translate(-50%,-100%);background:#0009;padding:1px 6px;font-size:13px;white-space:nowrap}
+#inventaire .boite{width:min(760px,96vw);max-height:94vh;display:flex;flex-direction:column}
+#grille{display:grid;grid-template-columns:repeat(auto-fill,minmax(48px,1fr));gap:3px;overflow:auto;margin:10px 0;min-height:120px;flex:1}
+#grille .case{width:100%}
+#barre2{display:flex;justify-content:center}
+#mort{background:#7a0000bb}
+#toucher{display:none}
+</style>
+</head>
+<body>
+<canvas id="jeu"></canvas>
+
+<div id="hud">
+  <div id="eau"></div><div id="flash"></div>
+  <div id="etiquettes"></div>
+  <div id="viseur"></div><div id="progres"><i></i></div>
+  <div id="infos"></div><div id="message"></div>
+  <div id="bas"><div id="nom"></div><div id="air"></div><div id="vie"></div><div id="barre"></div></div>
+</div>
+
+<div id="menu" class="ecran visible"><div class="boite">
+  <h1>CubiMonde</h1>
+  <h3>Type de monde</h3>
+  <div class="choix" data-groupe="monde"><button class="actif" data-v="normal">⛰️ Normal</button><button data-v="plat">🟩 Plat</button></div>
+  <h3>Mode de jeu</h3>
+  <div class="choix" data-groupe="mode"><button class="actif" data-v="creatif">🕊️ Créatif (immortel)</button><button data-v="survie">❤️ Survie</button></div>
+  <button class="grand vert" id="solo">▶ Jouer seul</button>
+  <h3>Jeu en ligne</h3>
+  <input id="pseudo" maxlength="16" placeholder="Ton pseudo">
+  <div class="choix" style="margin-top:8px"><button id="heberger">🌐 Créer une partie</button></div>
+  <div class="choix" style="margin-top:8px"><input id="code" maxlength="6" placeholder="Code de la partie"><button id="rejoindre">Rejoindre</button></div>
+  <div id="etat"></div>
+  <div class="petit">
+    <kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> bouger · <kbd>Espace</kbd> sauter · <kbd>R</kbd> courir<br>
+    Clic gauche casser · Clic droit poser · Clic molette copier<br>
+    <kbd>1</kbd>–<kbd>9</kbd> / molette inventaire · <kbd>E</kbd> tous les blocs<br>
+    Créatif : double <kbd>Espace</kbd> voler, <kbd>Espace</kbd> monter, <kbd>Maj</kbd> descendre<br>
+    <kbd>V</kbd> caméra · <kbd>G</kbd> relief 3D (lunettes rouge/cyan) · <kbd>F</kbd> allumer la dynamite<br>
+    <kbd>Échap</kbd> pause
+  </div>
+</div></div>
+
+<div id="pause" class="ecran"><div class="boite">
+  <h2>Pause</h2><div id="codePartie"></div>
+  <button class="grand vert" id="reprendre">Reprendre</button>
+  <button class="grand" id="changerMode">Changer de mode</button>
+  <button class="grand" id="quitter">Quitter vers le menu</button>
+</div></div>
+
+<div id="inventaire" class="ecran"><div class="boite">
+  <h2 id="titreInv">Blocs</h2>
+  <input id="recherche" placeholder="Chercher un bloc…">
+  <div id="grille"></div>
+  <div id="barre2"></div>
+  <div class="petit" id="aideInv"></div>
+  <button class="grand vert" id="fermerInv" style="flex:none">Fermer</button>
+</div></div>
+
+<div id="mort" class="ecran"><div class="boite">
+  <h2>Tu es mort !</h2><p id="cause"></p>
+  <button class="grand vert" id="renaitre">Réapparaître</button>
+</div></div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+
+/* ================= TEXTURES (dessinées par le code) ================= */
+const TUILES = 32, atlas = document.createElement("canvas");
+atlas.width = atlas.height = TUILES * 16;
+const actx = atlas.getContext("2d", { willReadFrequently: true });
+let nbTuiles = 0;
+let graine = 12345;
+const alea = () => (graine = (graine * 16807) % 2147483647) / 2147483647;
+const rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+
+function tuile(dessin) {
+  const img = actx.createImageData(16, 16);
+  const px = (x, y, c, k = 1, a = 255) => {
+    if (x < 0 || y < 0 || x > 15 || y > 15) return;
+    const v = rgb(c), i = (y * 16 + x) * 4;
+    img.data.set([v[0] * k, v[1] * k, v[2] * k, a].map(n => Math.min(255, n)), i);
+  };
+  const tout = f => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) f(x, y); };
+  dessin(px, tout);
+  const n = nbTuiles++;
+  actx.putImageData(img, (n % TUILES) * 16, Math.floor(n / TUILES) * 16);
+  return n;
+}
+const bruit = (c, v = .22) => tuile((p, t) => t((x, y) => p(x, y, c, 1 - v / 2 + alea() * v)));
+const taches = (fond, c, n = 7) => tuile((p, t) => {
+  t((x, y) => p(x, y, fond, .88 + alea() * .22));
+  for (let i = 0; i < n; i++) {
+    const a = 1 + alea() * 12 | 0, b = 1 + alea() * 12 | 0;
+    [[0,0],[1,0],[0,1],[1,1],[2,1]].forEach(([u, v]) => alea() < .85 && p(a + u, b + v, c, .85 + alea() * .35));
+  }
+});
+const briques = (c, joint, h = 4, l = 8) => tuile((p, t) => t((x, y) => {
+  const r = y / h | 0, j = y % h === h - 1 || (x + (r % 2) * (l / 2)) % l === 0;
+  p(x, y, j ? joint : c, .9 + alea() * .18);
+}));
+const planches = c => tuile((p, t) => t((x, y) => {
+  const r = y / 4 | 0, j = y % 4 === 3 || x === (r * 7 + 3) % 16;
+  p(x, y, c, j ? .65 : .92 + alea() * .12 + (r % 2) * .05);
+}));
+const ecorce = c => tuile((p, t) => { const col = [...Array(16)].map(() => .7 + alea() * .45); t((x, y) => p(x, y, c, col[x] + alea() * .12)); });
+const coupe = (ecor, bois) => tuile((p, t) => t((x, y) => {
+  const d = Math.max(Math.abs(x - 7.5), Math.abs(y - 7.5));
+  p(x, y, d > 6.5 ? ecor : bois, d > 6.5 ? .9 : (Math.floor(d) % 2 ? .8 : 1.05));
+}));
+const feuilles = c => tuile((p, t) => t((x, y) => alea() < .82 && p(x, y, c, .65 + alea() * .6)));
+const metal = c => tuile((p, t) => t((x, y) => p(x, y, c, x === 0 || y === 0 ? 1.25 : x === 15 || y === 15 ? .65 : (x + y) % 7 === 0 ? 1.12 : .97 + alea() * .06)));
+const poli = c => tuile((p, t) => t((x, y) => p(x, y, c, x === 0 || y === 0 || x === 15 || y === 15 ? .75 : .94 + alea() * .12)));
+const verre = (c, plein) => tuile((p, t) => t((x, y) => {
+  const bord = x === 0 || y === 0 || x === 15 || y === 15;
+  if (plein) p(x, y, c, bord ? 1.2 : 1, bord ? 230 : 130);
+  else if (bord || (x + y === 8 && x > 1 && x < 7) || (x + y === 21 && x > 8 && x < 13)) p(x, y, c);
+}));
+const plante = (tige, fleur, forme) => tuile(p => {
+  if (forme === "herbe") for (let x = 1; x < 15; x += 2) { const h = 5 + alea() * 9 | 0; for (let y = 16 - h; y < 16; y++) p(x + (y < 10 && x % 4 === 1 ? 1 : 0), y, tige, .75 + alea() * .5); }
+  else if (forme === "champignon") { for (let y = 10; y < 16; y++) { p(7, y, tige); p(8, y, tige, .85); } for (let y = 6; y < 10; y++) for (let x = 3 + (9 - y); x < 13 - (9 - y); x++) p(x, y, fleur, (x + y) % 5 ? 1 : 1.35); }
+  else if (forme === "torche") { for (let y = 6; y < 16; y++) { p(7, y, tige); p(8, y, tige, .75); } for (let y = 3; y < 6; y++) { p(7, y, fleur, 1.1); p(8, y, "#ffef9e"); } }
+  else if (forme === "pousse") { for (let y = 9; y < 16; y++) p(8, y, "#6b4a2b"); for (let i = 0; i < 40; i++) p(4 + alea() * 8 | 0, 3 + alea() * 8 | 0, tige, .7 + alea() * .5); }
+  else if (forme === "canne") for (let y = 0; y < 16; y++) [3, 8, 12].forEach(x => { p(x, y, tige, y % 5 ? 1 : .7); p(x + 1, y, tige, .8); });
+  else if (forme === "toile") for (let i = 0; i < 16; i++) { p(i, i, tige); p(15 - i, i, tige); p(7, i, tige); p(i, 7, tige); if (i > 3 && i < 12) { p(i, 3, tige); p(i, 12, tige); p(3, i, tige); p(12, i, tige); } }
+  else { for (let y = 8; y < 16; y++) p(8, y, tige); p(6, 12, tige); p(7, 13, tige); p(10, 11, tige); p(9, 12, tige);
+    for (let y = 3; y < 9; y++) for (let x = 5; x < 12; x++) if (Math.abs(x - 8) + Math.abs(y - 5.5) < 4) p(x, y, Math.abs(x - 8) + Math.abs(y - 5.5) < 1.5 ? "#ffd23f" : fleur, .9 + alea() * .2); }
+});
+
+/* ================= BLOCS ================= */
+const BLOCS = [{ nom: "Air", air: true }];
+const ID = {};
+// t : une tuile, ou [dessus, côté, dessous]
+function bloc(cle, nom, t, o = {}) {
+  if (!Array.isArray(t)) t = [t, t, t];
+  ID[cle] = BLOCS.length;
+  BLOCS.push(Object.assign({ cle, nom, t, dur: .8, solide: true, opaque: true }, o));
+}
+const transparent = { opaque: false };
+const fleurO = { opaque: false, solide: false, croix: true, dur: .05 };
+
+const terre = bruit("#8a5f3c", .35), herbeH = bruit("#5faa3c", .3), pierre = bruit("#858585", .2);
+const cote = (haut, bas) => tuile((p, t) => t((x, y) => p(x, y, y < 3 + ((x * 7) % 3) ? haut : bas, .85 + alea() * .3)));
+bloc("herbe", "Bloc d'herbe", [herbeH, cote("#5faa3c", "#8a5f3c"), terre], { drop: "terre" });
+bloc("terre", "Terre", terre);
+bloc("terre_sterile", "Terre stérile", taches("#7d5839", "#a38468", 12));
+bloc("podzol", "Podzol", [bruit("#6a4a20", .45), cote("#6a4a20", "#8a5f3c"), terre]);
+bloc("mycelium", "Mycélium", [bruit("#7d6b7e", .35), cote("#7d6b7e", "#8a5f3c"), terre]);
+bloc("herbe_neige", "Herbe enneigée", [bruit("#f4f8ff", .08), cote("#f4f8ff", "#8a5f3c"), terre], { drop: "terre" });
+bloc("pierre", "Pierre", pierre, { dur: 1.5, drop: "pierres" });
+bloc("pierres", "Pierres taillées", taches("#6b6b6b", "#a2a2a2", 14), { dur: 1.7 });
+bloc("pierres_mousse", "Pierres moussues", taches("#7a7a7a", "#4f7f3a", 10), { dur: 1.7 });
+bloc("pierre_lisse", "Pierre lisse", poli("#9c9c9c"), { dur: 1.5 });
+bloc("briques_pierre", "Briques de pierre", briques("#8a8a8a", "#555555", 8, 16), { dur: 1.5 });
+bloc("briques_pierre_mousse", "Briques de pierre moussues", briques("#7d8f6d", "#45553a", 8, 16), { dur: 1.5 });
+[["granite", "Granite", "#9a6c59"], ["diorite", "Diorite", "#c8c8cc"], ["andesite", "Andésite", "#8b8d8f"], ["tuf", "Tuf", "#6d6e62"], ["calcite", "Calcite", "#e2e3dd"], ["ardoise", "Ardoise des abîmes", "#4b4b52"]]
+  .forEach(([c, n, h]) => { bloc(c, n, taches(h, "#" + rgb(h).map(v => (v * .72 | 0).toString(16).padStart(2, "0")).join(""), 9), { dur: 1.5 });
+    bloc(c + "_poli", n + " (poli)", poli(h), { dur: 1.5 }); });
+bloc("roche_mere", "Roche-mère", taches("#444444", "#151515", 16), { dur: Infinity });
+bloc("sable", "Sable", bruit("#e0d39c", .16));
+bloc("sable_rouge", "Sable rouge", bruit("#bd6a2b", .18));
+bloc("gravier", "Gravier", taches("#8b8480", "#5f5a59", 18));
+bloc("argile", "Argile", bruit("#a0a7b4", .1));
+bloc("boue", "Boue", bruit("#3d393e", .2));
+bloc("gres", "Grès", briques("#ddce93", "#bfae72", 8, 16));
+bloc("gres_rouge", "Grès rouge", briques("#b8601f", "#934a14", 8, 16));
+bloc("neige", "Bloc de neige", bruit("#f4f8ff", .08), { dur: .3 });
+bloc("glace", "Glace", verre("#9cc4ff", true), { opaque: false, translucide: true, dur: .5 });
+bloc("glace_compacte", "Glace compactée", taches("#8fb4f5", "#c4dbff", 6), { dur: .6 });
+bloc("glace_bleue", "Glace bleue", taches("#6ea0f0", "#a9c9ff", 8), { dur: 1 });
+bloc("eau", "Eau", tuile((p, t) => t((x, y) => p(x, y, "#2f6fe0", .9 + Math.sin((x + y * 3) / 2.5) * .08 + alea() * .1, 165))), { opaque: false, translucide: true, solide: false, liquide: true });
+bloc("lave", "Lave", taches("#d84a0b", "#ffc12e", 11), { solide: false, liquide: true, lumiere: true, opaque: false });
+
+// Minerais et blocs de métaux
+[["charbon", "charbon", "#222222"], ["fer", "fer", "#d9a986"], ["cuivre", "cuivre", "#d9733f"], ["or", "d'or", "#ffd93b"], ["redstone", "redstone", "#e01010"], ["lapis", "lapis-lazuli", "#1f49b8"], ["diamant", "diamant", "#55e8e0"], ["emeraude", "d'émeraude", "#17c653"]]
+  .forEach(([c, n, h]) => {
+    const de = n.startsWith("d'") ? n : "de " + n;
+    bloc("minerai_" + c, "Minerai " + de, taches("#858585", h, 6), { dur: 2 });
+    bloc("minerai_profond_" + c, "Minerai profond " + de, taches("#4b4b52", h, 6), { dur: 2.5 });
+    bloc("bloc_" + c, "Bloc " + de, metal(h), { dur: 2.5 });
+  });
+bloc("netherite", "Bloc de nétherite", metal("#4a4245"), { dur: 4 });
+bloc("amethyste", "Bloc d'améthyste", taches("#8a62c9", "#c9a6ff", 9));
+
+// Bois
+const BOIS = [["chene", "chêne", "#6b5030", "#b8945f", "#3f8f2a"], ["sapin", "sapin", "#3b2813", "#7a5a34", "#2f5c3a"], ["bouleau", "bouleau", "#d8d8d0", "#d7c185", "#75a84a"],
+  ["jungle", "bois tropical", "#57461b", "#b88764", "#2f9a12"], ["acacia", "acacia", "#6a645c", "#b45f32", "#6f9a20"], ["chene_noir", "chêne noir", "#32240f", "#4a3018", "#2c6a1c"],
+  ["paletuvier", "palétuvier", "#554130", "#7a342f", "#5a8a22"], ["cerisier", "cerisier", "#3a2029", "#e5b3ad", "#f2a8c9"], ["carmin", "bois carmin", "#6e2a3d", "#6b344a", "#8f1515"], ["biscornu", "bois biscornu", "#233f4d", "#2b6a65", "#148a83"]];
+BOIS.forEach(([c, n, ec, bo, fe]) => {
+  const de = "de " + n;
+  bloc("buche_" + c, "Bûche " + de, [coupe(ec, bo), ecorce(ec), coupe(ec, bo)], { dur: 1.2 });
+  bloc("planches_" + c, "Planches " + de, planches(bo), { dur: 1.2 });
+  bloc("feuilles_" + c, "Feuillage " + de, feuilles(fe), { opaque: false, dur: .25 });
+});
+
+// Couleurs
+const COULEURS = [["blanc", "blanc", "#e9ecec"], ["gris_clair", "gris clair", "#9d9d97"], ["gris", "gris", "#474f52"], ["noir", "noir", "#1d1d21"], ["marron", "marron", "#835432"], ["rouge", "rouge", "#b02e26"], ["orange", "orange", "#f9801d"], ["jaune", "jaune", "#fed83d"],
+  ["vert_clair", "vert clair", "#80c71f"], ["vert", "vert", "#5e7c16"], ["cyan", "cyan", "#169c9c"], ["bleu_clair", "bleu clair", "#3ab3da"], ["bleu", "bleu", "#3c44aa"], ["violet", "violet", "#8932b8"], ["magenta", "magenta", "#c74ebd"], ["rose", "rose", "#f38baa"]];
+COULEURS.forEach(([c, n, h]) => bloc("laine_" + c, "Laine " + n, tuile((p, t) => t((x, y) => p(x, y, h, ((x + y) % 4 < 2 ? .93 : 1.03) + alea() * .08))), { dur: .5 }));
+COULEURS.forEach(([c, n, h]) => bloc("beton_" + c, "Béton " + n, bruit(h, .05), { dur: 1.4 }));
+COULEURS.forEach(([c, n, h]) => bloc("poudre_" + c, "Béton en poudre " + n, bruit(h, .35), { dur: .5 }));
+COULEURS.forEach(([c, n, h]) => { const m = "#" + rgb(h).map((v, i) => ((v + [150, 95, 70][i]) / 2 | 0).toString(16).padStart(2, "0")).join(""); bloc("terracotta_" + c, "Terre cuite " + n, bruit(m, .08), { dur: 1.3 }); });
+bloc("terracotta", "Terre cuite", bruit("#985e43", .08));
+bloc("verre", "Verre", verre("#dff6ff"), { opaque: false, dur: .3 });
+COULEURS.forEach(([c, n, h]) => bloc("verre_" + c, "Verre " + n, verre(h, true), { opaque: false, translucide: true, dur: .3 }));
+
+// Construction
+bloc("briques", "Briques", briques("#9a4f3c", "#c9bcb2"));
+bloc("briques_boue", "Briques de boue", briques("#8a6b50", "#5f4938"));
+bloc("quartz", "Bloc de quartz", poli("#ece6df"));
+bloc("briques_quartz", "Briques de quartz", briques("#ece6df", "#c4bcb0", 8, 8));
+bloc("prismarine", "Prismarine", taches("#5fa596", "#82c9b5", 12));
+bloc("prismarine_briques", "Briques de prismarine", briques("#63ac9c", "#3f7a6f", 4, 8));
+bloc("prismarine_sombre", "Prismarine sombre", briques("#335e50", "#1f3d33", 8, 8));
+bloc("lanterne_mer", "Lanterne aquatique", taches("#b9d9d2", "#ffffff", 10), { lumiere: true });
+bloc("purpur", "Bloc de purpur", briques("#a97ba9", "#7d567d", 8, 8));
+bloc("pierre_end", "Pierre de l'End", taches("#dde0a5", "#b9bd80", 12));
+bloc("briques_end", "Briques de l'End", briques("#dde3a8", "#a9ae77", 8, 8));
+bloc("netherrack", "Netherrack", taches("#6f3434", "#4a1f1f", 16), { dur: .5 });
+bloc("briques_nether", "Briques du Nether", briques("#33181d", "#14090b"));
+bloc("briques_nether_rouge", "Briques rouges du Nether", briques("#4a0a0d", "#210305"));
+bloc("sable_ames", "Sable des âmes", taches("#4f3d33", "#2b201a", 11));
+bloc("basalte", "Basalte", ecorce("#55565b"), { dur: 1.5 });
+bloc("roche_noire", "Roche noire", taches("#2d2930", "#141216", 10), { dur: 1.5 });
+bloc("briques_roche_noire", "Briques de roche noire", briques("#332e38", "#141117", 8, 8), { dur: 1.5 });
+bloc("magma", "Bloc de magma", taches("#5c1f10", "#ff8a1c", 9), { lumiere: true, brule: true });
+bloc("obsidienne", "Obsidienne", taches("#150f22", "#3b2754", 9), { dur: 6 });
+bloc("obsidienne_pleureuse", "Obsidienne pleureuse", taches("#1d0f33", "#8a2be2", 9), { dur: 6, lumiere: true });
+bloc("pierre_lumineuse", "Pierre lumineuse", taches("#a8763c", "#ffe08a", 13), { lumiere: true, dur: .4 });
+bloc("champilampe", "Champilampe", taches("#e0662a", "#fff0b0", 8), { lumiere: true });
+bloc("lampe", "Lampe de redstone allumée", metal("#f2b866"), { lumiere: true });
+[["ocre", "ocre", "#f7e08a"], ["verte", "verdoyante", "#cdeeb0"], ["perle", "nacrée", "#f0d0ee"]].forEach(([c, n, h]) => bloc("grenouille_" + c, "Lampe-grenouille " + n, poli(h), { lumiere: true }));
+bloc("bibliotheque", "Bibliothèque", [planches("#b8945f"), tuile((p, t) => { const cs = ["#a83232", "#2f6b3a", "#2f4a8a", "#8a6a2f", "#6a2f7a"]; let c; t((x, y) => { if (x === 0) c = cs[(y / 8 | 0)]; const bois = y % 8 === 0 || y % 8 === 7; p(x, y, bois ? "#b8945f" : cs[(x / 2 + (y / 8 | 0) * 3 | 0) % 5], bois ? 1 : x % 2 ? .8 : 1.1); }); }), planches("#b8945f")]);
+const boisC = planches("#b8945f");
+bloc("etabli", "Établi", [tuile((p, t) => t((x, y) => p(x, y, "#a5713d", x % 5 === 0 || y % 5 === 0 ? .55 : 1))), taches("#b8945f", "#5a3a1c", 5), boisC]);
+bloc("four", "Four", [poli("#808080"), tuile((p, t) => t((x, y) => { const trou = x > 3 && x < 12 && y > 7 && y < 13; p(x, y, trou ? (y > 10 ? "#ff8a1c" : "#1a1a1a") : "#808080", .9 + alea() * .2); })), poli("#808080")]);
+bloc("coffre", "Coffre (décor)", [poli("#a8742c"), tuile((p, t) => t((x, y) => { const serrure = x > 6 && x < 9 && y > 4 && y < 9; p(x, y, serrure ? "#d8d8d8" : "#a8742c", x === 0 || x === 15 || y === 0 || y === 15 || y === 6 ? .5 : 1); })), poli("#a8742c")]);
+bloc("tnt", "Dynamite", [taches("#c9432f", "#eeeeee", 4), tuile((p, t) => t((x, y) => { const bande = y > 4 && y < 11; p(x, y, bande ? (y > 6 && y < 9 && x % 4 !== 0 ? "#222222" : "#eeeeee") : "#d63a28", x % 4 === 0 ? .75 : 1); })), bruit("#c9432f")], { dur: .1 });
+bloc("foin", "Botte de foin", [coupe("#b8960f", "#d9b52b"), briques("#d6b11f", "#8a3a14", 8, 32), coupe("#b8960f", "#d9b52b")]);
+bloc("citrouille", "Citrouille", [coupe("#a85a0c", "#c9781a"), ecorce("#e08a1c"), ecorce("#c9781a")]);
+bloc("lanterne_citrouille", "Citrouille-lanterne", [coupe("#a85a0c", "#c9781a"), tuile((p, t) => t((x, y) => { const oeil = (y > 3 && y < 7 && ((x > 2 && x < 6) || (x > 9 && x < 13))) || (y > 9 && y < 13 && x > 3 && x < 12 && (x + y) % 5); p(x, y, oeil ? "#fff27a" : "#e08a1c", x % 4 === 0 && !oeil ? .8 : 1); })), ecorce("#c9781a")], { lumiere: true });
+bloc("pasteque", "Pastèque", [coupe("#4a7a12", "#6f9a1c"), tuile((p, t) => t((x, y) => p(x, y, x % 4 < 2 ? "#7fae24" : "#4a7a12", .9 + alea() * .2))), coupe("#4a7a12", "#6f9a1c")]);
+bloc("cactus", "Cactus", [coupe("#2f6a1c", "#6fae3c"), tuile((p, t) => t((x, y) => p(x, y, x % 4 === 1 && y % 3 === 0 ? "#e8f0c0" : "#3f8a28", x % 4 === 3 ? .75 : 1))), coupe("#2f6a1c", "#6fae3c")], { brule: true, dur: .4 });
+bloc("eponge", "Éponge", taches("#d6d04a", "#8a8420", 12));
+bloc("miel", "Bloc de miel", verre("#f0a31c", true), { opaque: false, translucide: true });
+bloc("slime", "Bloc de slime", verre("#6fd45a", true), { opaque: false, translucide: true, rebond: true });
+bloc("mousse", "Bloc de mousse", bruit("#5a7a28", .35), { dur: .2 });
+bloc("os", "Bloc d'os", [coupe("#d8d4bc", "#c4bfa4"), ecorce("#e0dcc6"), coupe("#d8d4bc", "#c4bfa4")]);
+bloc("varech_seche", "Bloc de varech séché", briques("#323a26", "#171b10", 5, 16));
+bloc("verrue_nether", "Bloc de verrues du Nether", taches("#7a0607", "#a81a1a", 14));
+bloc("verrue_biscornue", "Bloc de verrues biscornues", taches("#14706c", "#1fb0a4", 14));
+bloc("champi_rouge_bloc", "Bloc de champignon rouge", taches("#c22a25", "#eadfd0", 6));
+bloc("champi_brun_bloc", "Bloc de champignon brun", bruit("#956f51", .12));
+bloc("corail_tube", "Corail tubulaire", taches("#2f54d0", "#5f8aff", 12));
+bloc("corail_cerveau", "Corail cerveau", taches("#c9518f", "#ef86bd", 12));
+bloc("corail_bulle", "Corail bulbeux", taches("#9a1a9a", "#d04ad0", 12));
+bloc("corail_feu", "Corail de feu", taches("#a8222c", "#e0505a", 12));
+bloc("corail_corne", "Corail cornu", taches("#d0bd35", "#fff080", 12));
+
+// Plantes et décorations
+bloc("hautes_herbes", "Hautes herbes", plante("#5faa3c", "", "herbe"), fleurO);
+bloc("buisson_mort", "Buisson mort", plante("#8a6232", "", "herbe"), fleurO);
+[["coquelicot", "Coquelicot", "#e02a1c"], ["pissenlit", "Pissenlit", "#ffe11c"], ["orchidee", "Orchidée bleue", "#2fb4ff"], ["allium", "Allium", "#b878ff"], ["tulipe_rose", "Tulipe rose", "#ff9ac2"], ["tulipe_orange", "Tulipe orange", "#ff8a1c"], ["marguerite", "Marguerite", "#f4f4f4"], ["bleuet", "Bleuet", "#4a6aff"]]
+  .forEach(([c, n, h]) => bloc(c, n, plante("#3f8a28", h, "fleur"), fleurO));
+bloc("champi_rouge", "Champignon rouge", plante("#e8dcc8", "#d62a20", "champignon"), fleurO);
+bloc("champi_brun", "Champignon brun", plante("#e8dcc8", "#9a6a48", "champignon"), fleurO);
+bloc("pousse", "Pousse de chêne", plante("#4a9a2a", "", "pousse"), fleurO);
+bloc("canne", "Canne à sucre", plante("#8fd05a", "", "canne"), fleurO);
+bloc("toile", "Toile d'araignée", plante("#e8e8e8", "", "toile"), fleurO);
+bloc("torche", "Torche", plante("#8a6232", "#ff9a1c", "torche"), Object.assign({ lumiere: true }, fleurO));
+
+const texAtlas = atlas;
+
+/* ================= MONDE ================= */
+const T = 16, H = 96, MER = 32;
+let seed = 1, typeMonde = "normal", mode = "creatif";
+let chunks = new Map(), modifs = new Map();
+
+function hash(x, y, z = 0) {
+  let h = (Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263) + Math.imul(z | 0, 1440662683) + Math.imul(seed, 1274126177)) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1103515245);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+const lisse = t => t * t * (3 - 2 * t), mix = (a, b, t) => a + (b - a) * t;
+function bruit2(x, z, s = 0) {
+  const i = Math.floor(x), j = Math.floor(z), u = lisse(x - i), v = lisse(z - j);
+  return mix(mix(hash(i, j, s), hash(i + 1, j, s), u), mix(hash(i, j + 1, s), hash(i + 1, j + 1, s), u), v);
+}
+function bruit3(x, y, z) {
+  const i = Math.floor(x), j = Math.floor(y), k = Math.floor(z), u = lisse(x - i), v = lisse(y - j), w = lisse(z - k);
+  const f = c => mix(mix(hash(i, j, c), hash(i + 1, j, c), u), mix(hash(i, j + 1, c), hash(i + 1, j + 1, c), u), v);
+  return mix(f(k), f(k + 1), w);
+}
+const fbm = (x, z, s) => bruit2(x, z, s) * .57 + bruit2(x * 2.1, z * 2.1, s + 1) * .29 + bruit2(x * 4.3, z * 4.3, s + 2) * .14;
+const lisser = (a, b, v) => lisse(Math.max(0, Math.min(1, (v - a) / (b - a))));
+
+function terrain(x, z) {
+  if (typeMonde === "plat") return { h: 20, biome: "plaine" };
+  const base = fbm(x / 110, z / 110, 10), mont = lisser(.52, .74, fbm(x / 190, z / 190, 20));
+  const lac = lisser(.6, .73, fbm(x / 75, z / 75, 30));
+  let h = 29 + base * 14 + mont * (8 + fbm(x / 42, z / 42, 40) * 46) - lac * (1 - mont) * 15;
+  h = Math.max(6, Math.min(H - 12, h | 0));
+  const temp = fbm(x / 240, z / 240, 50), hum = fbm(x / 130, z / 130, 60);
+  let biome = temp > .62 && hum < .52 ? "desert" : temp < .36 ? "neige" : hum > .52 ? "foret" : "plaine";
+  if (mont > .55 && h > 50) biome = "montagne";
+  return { h, biome };
+}
+
+function genererChunk(cx, cz) {
+  const d = new Uint16Array(T * T * H);
+  const set = (x, y, z, b, force = true) => {
+    if (x < 0 || z < 0 || x >= T || z >= T || y < 0 || y >= H) return;
+    const i = x + z * T + y * T * T;
+    if (force || !d[i]) d[i] = b;
+  };
+  for (let x = 0; x < T; x++) for (let z = 0; z < T; z++) {
+    const wx = cx * T + x, wz = cz * T + z, { h, biome } = terrain(wx, wz);
+    for (let y = 0; y <= h; y++) {
+      let b = ID.pierre;
+      if (y === 0) b = ID.roche_mere;
+      else if (typeMonde === "plat") b = y === h ? ID.herbe : y > h - 4 ? ID.terre : ID.pierre;
+      else if (y > h - 4) {
+        if (biome === "desert") b = ID.sable;
+        else if (h <= MER + 1) b = hash(wx >> 2, wz >> 2, 7) < .2 ? ID.argile : ID.sable;
+        else if (biome === "montagne") b = h > 62 ? ID.neige : ID.pierre;
+        else b = y === h ? (biome === "neige" ? ID.herbe_neige : ID.herbe) : ID.terre;
+      } else {
+        const r = hash(wx, y, wz);
+        const veine = hash(wx >> 1, y >> 1, wz >> 1);
+        const m = veine < .012 ? "charbon" : veine < .019 ? "fer" : veine < .024 ? "cuivre" : veine < .027 && y < 32 ? "or" : veine < .030 && y < 24 ? "redstone" : veine < .032 && y < 28 ? "lapis" : veine < .0335 && y < 16 ? "diamant" : veine < .0345 && biome === "montagne" ? "emeraude" : null;
+        if (m && r < .65) b = ID[(y < 12 ? "minerai_profond_" : "minerai_") + m];
+        else if (y < 12) b = ID.ardoise;
+        else { const v = bruit3(wx / 9, y / 9, wz / 9); if (v > .76) b = ID.granite; else if (v < .22) b = ID.andesite; }
+      }
+      // Grottes
+      if (typeMonde === "normal" && y > 0 && h > MER + 2 && y < h - 3 && Math.abs(bruit3(wx / 18, y / 12, wz / 18) - .5) < .045 && bruit3(wx / 40 + 9, y / 30, wz / 40) > .45)
+        b = y < 9 ? ID.lave : 0;
+      set(x, y, z, b);
+    }
+    if (typeMonde === "normal") for (let y = h + 1; y <= MER; y++) set(x, y, z, biome === "neige" && y === MER ? ID.glace : ID.eau);
+  }
+  // Végétation (on déborde pour les arbres des chunks voisins)
+  if (typeMonde === "normal") for (let x = -3; x < T + 3; x++) for (let z = -3; z < T + 3; z++) {
+    const wx = cx * T + x, wz = cz * T + z, r = hash(wx, wz, 99);
+    if (r > .2) continue;
+    const { h, biome } = terrain(wx, wz);
+    if (h <= MER) continue;
+    const densite = biome === "foret" ? .035 : biome === "neige" ? .01 : biome === "plaine" ? .003 : biome === "montagne" && h < 58 ? .004 : 0;
+    if (r < densite) {
+      const k = hash(wx, wz, 5);
+      const e = biome === "neige" || biome === "montagne" ? "sapin" : biome === "plaine" ? (k < .15 ? "cerisier" : "chene") : k < .6 ? "chene" : k < .85 ? "bouleau" : "chene_noir";
+      const t = 4 + (hash(wx, wz, 6) * 3 | 0), bois = ID["buche_" + e], f = ID["feuilles_" + e];
+      for (let dy = t - 2; dy <= t + 1; dy++) {
+        const ray = e === "sapin" ? (dy === t + 1 ? 0 : 1 + ((t - dy) % 2 === 0 ? 1 : 0)) : dy >= t ? 1 : 2;
+        for (let a = -ray; a <= ray; a++) for (let c = -ray; c <= ray; c++)
+          if (!(Math.abs(a) === ray && Math.abs(c) === ray && ray > 0)) set(x + a, h + dy, z + c, f, false);
+      }
+      for (let dy = 1; dy <= t; dy++) set(x, h + dy, z, bois);
+    } else if (biome === "desert") {
+      if (r < .006) for (let dy = 1; dy <= 2 + (r * 1000 | 0) % 2; dy++) set(x, h + dy, z, ID.cactus);
+      else if (r < .014) set(x, h + 1, z, ID.buisson_mort, false);
+    } else if (biome === "plaine" || biome === "foret") {
+      if (r < .15) set(x, h + 1, z, ID.hautes_herbes, false);
+      else if (r < .17) set(x, h + 1, z, ID[["coquelicot", "pissenlit", "orchidee", "allium", "tulipe_rose", "tulipe_orange", "marguerite", "bleuet"][hash(wx >> 3, wz >> 3, 8) * 8 | 0]], false);
+      else if (r < .173) set(x, h + 1, z, biome === "foret" ? ID.champi_rouge : ID.citrouille, false);
+    }
+  }
+  const m = modifs.get(cx + "," + cz);
+  if (m) for (const [i, b] of m) d[i] = b;
+  const c = { cx, cz, d, mailles: null, sale: true };
+  chunks.set(cx + "," + cz, c);
+  return c;
+}
+
+const lire = (x, y, z) => {
+  if (y < 0 || y >= H) return 0;
+  const c = chunks.get((x >> 4) + "," + (z >> 4));
+  return c ? c.d[(x & 15) + (z & 15) * T + y * T * T] : 0;
+};
+function ecrire(x, y, z, b, partager = true) {
+  if (y < 0 || y >= H) return;
+  const cx = x >> 4, cz = z >> 4, k = cx + "," + cz, i = (x & 15) + (z & 15) * T + y * T * T;
+  if (!modifs.has(k)) modifs.set(k, new Map());
+  modifs.get(k).set(i, b);
+  const c = chunks.get(k);
+  if (c) c.d[i] = b;
+  for (let a = -1; a <= 1; a++) for (let e = -1; e <= 1; e++) {
+    const v = chunks.get(((x + a) >> 4) + "," + ((z + e) >> 4));
+    if (v) v.sale = v.urgent = true;
+  }
+  if (partager) envoyer({ t: "bloc", x, y, z, b });
+}
+
+/* ================= WEBGL ================= */
+const canvas = $("jeu");
+const gl = canvas.getContext("webgl", { antialias: false });
+if (!gl) $("etat").textContent = "Ton navigateur ne gère pas WebGL : le jeu ne peut pas démarrer.";
+function shader(type, src) {
+  const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw gl.getShaderInfoLog(s);
+  return s;
+}
+const prog = gl.createProgram();
+gl.attachShader(prog, shader(gl.VERTEX_SHADER, `
+attribute vec3 p; attribute vec2 uv; attribute float l;
+uniform mat4 vp, m; varying vec2 vuv; varying float vl, dist;
+void main(){ gl_Position = vp * m * vec4(p,1.0); vuv=uv; vl=l; dist=gl_Position.w; }`));
+gl.attachShader(prog, shader(gl.FRAGMENT_SHADER, `
+precision mediump float; uniform sampler2D tex; uniform vec3 ciel; uniform vec4 teinte; uniform float jour, loin;
+varying vec2 vuv; varying float vl, dist;
+void main(){
+  vec4 c = teinte.a > 0.0 ? vec4(teinte.rgb, teinte.a) : texture2D(tex, vuv);
+  if (c.a < 0.1) discard;
+  float l = vl > 1.5 ? 1.0 : vl * jour;
+  float f = clamp((dist - loin*0.6)/(loin*0.4), 0.0, 1.0);
+  gl_FragColor = vec4(mix(c.rgb*l, ciel, f), c.a);
+}`));
+gl.linkProgram(prog); gl.useProgram(prog);
+const A = { p: gl.getAttribLocation(prog, "p"), uv: gl.getAttribLocation(prog, "uv"), l: gl.getAttribLocation(prog, "l") };
+const U = {}; ["vp", "m", "ciel", "teinte", "jour", "loin"].forEach(n => U[n] = gl.getUniformLocation(prog, n));
+Object.values(A).forEach(a => gl.enableVertexAttribArray(a));
+const tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex);
+gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, texAtlas);
+for (const [p, v] of [[gl.TEXTURE_MIN_FILTER, gl.NEAREST], [gl.TEXTURE_MAG_FILTER, gl.NEAREST], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, p, v);
+
+function maillage(tab, mode3 = gl.TRIANGLES) {
+  if (!tab.length) return null;
+  const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(tab), gl.STATIC_DRAW);
+  return { buf, n: tab.length / 6, mode3 };
+}
+function dessiner(m, mat = IDENT) {
+  if (!m) return;
+  gl.uniformMatrix4fv(U.m, false, mat);
+  gl.bindBuffer(gl.ARRAY_BUFFER, m.buf);
+  gl.vertexAttribPointer(A.p, 3, gl.FLOAT, false, 24, 0);
+  gl.vertexAttribPointer(A.uv, 2, gl.FLOAT, false, 24, 12);
+  gl.vertexAttribPointer(A.l, 1, gl.FLOAT, false, 24, 20);
+  gl.drawArrays(m.mode3, 0, m.n);
+}
+// Matrices 4x4 (ordre colonnes)
+const IDENT = new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]);
+function mul(a, b) { const r = new Float32Array(16); for (let c = 0; c < 4; c++) for (let l = 0; l < 4; l++) r[c * 4 + l] = a[l] * b[c * 4] + a[4 + l] * b[c * 4 + 1] + a[8 + l] * b[c * 4 + 2] + a[12 + l] * b[c * 4 + 3]; return r; }
+const trans = (x, y, z) => { const m = IDENT.slice(); m[12] = x; m[13] = y; m[14] = z; return m; };
+const echelle = (x, y, z) => { const m = IDENT.slice(); m[0] = x; m[5] = y; m[10] = z; return m; };
+const rotX = a => { const m = IDENT.slice(), c = Math.cos(a), s = Math.sin(a); m[5] = c; m[6] = s; m[9] = -s; m[10] = c; return m; };
+const rotY = a => { const m = IDENT.slice(), c = Math.cos(a), s = Math.sin(a); m[0] = c; m[2] = -s; m[8] = s; m[10] = c; return m; };
+function perspective(fov, r, n, f) { const t = 1 / Math.tan(fov / 2); return new Float32Array([t / r,0,0,0, 0,t,0,0, 0,0,(f + n) / (n - f),-1, 0,0,2 * f * n / (n - f),0]); }
+const direction = (yaw, pitch) => [-Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch)];
+
+// Faces : normale, 4 coins, lumière
+const FACES = [
+  { n: [0, 1, 0], c: [[0,1,1],[1,1,1],[1,1,0],[0,1,0]], l: 1, t: 0 },
+  { n: [0, -1, 0], c: [[0,0,0],[1,0,0],[1,0,1],[0,0,1]], l: .5, t: 2 },
+  { n: [1, 0, 0], c: [[1,0,1],[1,0,0],[1,1,0],[1,1,1]], l: .7, t: 1 },
+  { n: [-1, 0, 0], c: [[0,0,0],[0,0,1],[0,1,1],[0,1,0]], l: .7, t: 1 },
+  { n: [0, 0, 1], c: [[0,0,1],[1,0,1],[1,1,1],[0,1,1]], l: .85, t: 1 },
+  { n: [0, 0, -1], c: [[1,0,0],[0,0,0],[0,1,0],[1,1,0]], l: .85, t: 1 }
+];
+const UV = [[0,1],[1,1],[1,0],[0,0]];
+const coordUV = (n, u, v) => [((n % TUILES) + .001 + u * .998) / TUILES, (Math.floor(n / TUILES) + .001 + v * .998) / TUILES];
+
+function construire(c) {
+  const dur = [], clair = [], ox = c.cx * T, oz = c.cz * T;
+  // Hauteur du ciel : bloc opaque le plus haut de chaque colonne
+  const toit = new Int16Array(18 * 18);
+  for (let x = -1; x <= T; x++) for (let z = -1; z <= T; z++) {
+    let y = H - 1;
+    while (y > 0) { const b = BLOCS[lire(ox + x, y, oz + z)]; if (b.opaque && !b.air) break; y--; }
+    toit[x + 1 + (z + 1) * 18] = y;
+  }
+  const ajoute = (tab, pts, t, lum) => {
+    const ordre = lum[0] + lum[2] >= lum[1] + lum[3] ? [0,1,2,0,2,3] : [1,2,3,1,3,0];
+    for (const i of ordre) { const [u, v] = coordUV(t, UV[i][0], UV[i][1]); tab.push(pts[i][0], pts[i][1], pts[i][2], u, v, lum[i]); }
+  };
+  for (let y = 0; y < H; y++) for (let z = 0; z < T; z++) for (let x = 0; x < T; x++) {
+    const id = c.d[x + z * T + y * T * T];
+    if (!id) continue;
+    const b = BLOCS[id], wx = ox + x, wy = y, wz = oz + z;
+    if (b.croix) {
+      const l = b.lumiere ? 2 : y >= toit[x + 1 + (z + 1) * 18] ? .95 : .55;
+      for (const [a, d, e, f] of [[.15,.15,.85,.85], [.15,.85,.85,.15]]) {
+        const pts = [[wx+a,wy,wz+d],[wx+e,wy,wz+f],[wx+e,wy+1,wz+f],[wx+a,wy+1,wz+d]];
+        ajoute(dur, pts, b.t[1], [l,l,l,l]);
+        ajoute(dur, [pts[1],pts[0],pts[3],pts[2]], b.t[1], [l,l,l,l]);
+      }
+      continue;
+    }
+    const basLiquide = b.liquide && lire(wx, wy + 1, wz) !== id ? .875 : 1;
+    for (const f of FACES) {
+      const nx = wx + f.n[0], ny = wy + f.n[1], nz = wz + f.n[2];
+      if (ny < 0) continue;
+      const vid = lire(nx, ny, nz), v = BLOCS[vid];
+      if (!v.air && (v.opaque || (vid === id && !id.toString().startsWith("-") && !b.cle.startsWith("feuilles")))) continue;
+      const ciel = ny > toit[nx - ox + 1 + (nz - oz + 1) * 18] ? 1 : Math.max(.38, .8 - (toit[nx - ox + 1 + (nz - oz + 1) * 18] - ny) * .06);
+      const lum = f.c.map(p => {
+        if (b.lumiere) return 2;
+        // Occlusion ambiante : ombre douce dans les coins
+        const axes = [0, 1, 2].filter(i => !f.n[i]);
+        const op = (u, w) => { const q = [nx, ny, nz]; q[axes[0]] += u; q[axes[1]] += w; const o = BLOCS[lire(q[0], q[1], q[2])]; return o.opaque && !o.air ? 1 : 0; };
+        const du = p[axes[0]] ? 1 : -1, dw = p[axes[1]] ? 1 : -1;
+        const s1 = op(du, 0), s2 = op(0, dw), co = s1 && s2 ? 1 : op(du, dw);
+        return f.l * ciel * (1 - (s1 + s2 + co) * .16);
+      });
+      ajoute(b.translucide ? clair : dur, f.c.map(p => [wx + p[0], wy + p[1] * basLiquide, wz + p[2]]), b.t[f.t], lum);
+    }
+  }
+  if (c.mailles) c.mailles.forEach(m => m && gl.deleteBuffer(m.buf));
+  c.mailles = [maillage(dur), maillage(clair)];
+  c.sale = c.urgent = false;
+}
+
+// Boîte colorée (personnages, contour)
+function boite(x0, y0, z0, x1, y1, z1) {
+  const t = [];
+  for (const f of FACES) for (const i of [0,1,2,0,2,3]) { const p = f.c[i]; t.push(p[0] ? x1 : x0, p[1] ? y1 : y0, p[2] ? z1 : z0, 0, 0, f.l); }
+  return maillage(t);
+}
+const cube1 = boite(0, 0, 0, 1, 1, 1);
+const lignes = (() => { const t = [], e = -.003, g = 1.003; const P = (a, b, c) => t.push(a ? g : e, b ? g : e, c ? g : e, 0, 0, 1);
+  for (const a of [0,1]) for (const b of [0,1]) { P(0,a,b); P(1,a,b); P(a,0,b); P(a,1,b); P(a,b,0); P(a,b,1); } return maillage(t, gl.LINES); })();
+function couleur(hex, a = 1) { const c = rgb(hex); gl.uniform4f(U.teinte, c[0] / 255, c[1] / 255, c[2] / 255, a); }
+function morceau(base, hex, x, y, z, l, h, p) { couleur(hex); dessiner(cube1, mul(base, mul(trans(x, y, z), echelle(l, h, p)))); }
+
+// Personnage original : petit explorateur
+function personnage(j) {
+  const base = mul(trans(j.x, j.y, j.z), rotY(j.yaw));
+  const bal = Math.sin(j.marche || 0) * .7;
+  const habit = j.couleur;
+  for (const s of [-1, 1]) {
+    const jambe = mul(base, mul(trans(s * .13, .7, 0), rotX(bal * s)));
+    morceau(jambe, "#3b3f5c", -.11, -.7, -.12, .22, .7, .24);
+    morceau(jambe, "#5a3a22", -.12, -.72, -.17, .24, .16, .3);
+    const bras = mul(base, mul(trans(s * .36, 1.32, 0), rotX(-bal * s)));
+    morceau(bras, habit, -.09, -.45, -.1, .18, .5, .2);
+    morceau(bras, "#c68a62", -.085, -.62, -.095, .17, .18, .19);
+  }
+  morceau(base, habit, -.27, .7, -.15, .54, .68, .3);
+  morceau(base, "#f2c14e", -.28, .7, -.16, .56, .1, .32);
+  morceau(base, "#7a4a2a", -.2, .85, .15, .4, .45, .16); // sac à dos
+  const tete = mul(base, mul(trans(0, 1.38, 0), rotX(j.pitch * .8)));
+  morceau(tete, "#d99c72", -.24, 0, -.24, .48, .44, .48);
+  morceau(tete, "#2f7d6d", -.27, .36, -.27, .54, .16, .54); // bonnet
+  morceau(tete, "#f4f1de", -.07, .52, -.07, .14, .12, .14); // pompon
+  for (const s of [-1, 1]) { morceau(tete, "#ffffff", s * .12 - .06, .18, -.25, .12, .1, .02); morceau(tete, "#1d3557", s * .12 - .03, .18, -.26, .06, .08, .02); }
+  morceau(tete, "#8a4a3a", -.08, .07, -.25, .16, .03, .02);
+}
+
+/* ================= JOUEUR ================= */
+const joueur = { x: 0, y: 40, z: 0, vx: 0, vy: 0, vz: 0, yaw: 0, pitch: 0, sol: false, vol: false, vie: 20, air: 10, chute: 0, marche: 0, corps: 0, couleur: "#d1495b" };
+let barre = [], sel = 0, enJeu = false, ouvert = "menu", camera = 0, camDist = 8, relief = false, temps = 60, depart = [0, 40, 0];
+const CAMS = ["1re personne", "3e personne (dos)", "3e personne (face)", "Caméra 3D libre"];
+
+const largeur = .3, haut = 1.8;
+function collision(x, y, z) {
+  for (let a = Math.floor(x - largeur); a <= Math.floor(x + largeur); a++)
+    for (let b = Math.floor(y); b <= Math.floor(y + haut); b++)
+      for (let c = Math.floor(z - largeur); c <= Math.floor(z + largeur); c++)
+        if (b < 0 || BLOCS[lire(a, b, c)].solide) return true;
+  return false;
+}
+function deplacer(axe, d) {
+  const pas = Math.ceil(Math.abs(d) / .2);
+  for (let i = 0; i < pas; i++) {
+    const avant = joueur[axe]; joueur[axe] += d / pas;
+    if (collision(joueur.x, joueur.y, joueur.z)) {
+      if (axe === "y") joueur.y = d < 0 ? Math.floor(joueur.y) + 1.0001 : avant;
+      else joueur[axe] = avant;
+      return true;
+    }
+  }
+  return false;
+}
+const touches = {};
+function physique(dt) {
+  const j = joueur;
+  if (!chunks.has((Math.floor(j.x) >> 4) + "," + (Math.floor(j.z) >> 4))) return;
+  const actif = ouvert === null;
+  const k = c => actif && touches[c] ? 1 : 0;
+  const av = Math.max(k("KeyW"), k("ArrowUp")) - Math.max(k("KeyS"), k("ArrowDown"));
+  const dr = Math.max(k("KeyD"), k("ArrowRight")) - Math.max(k("KeyA"), k("ArrowLeft"));
+  const dans = BLOCS[lire(Math.floor(j.x), Math.floor(j.y + .4), Math.floor(j.z))];
+  const nage = dans.liquide;
+  const maj = Math.max(k("ShiftLeft"), k("ShiftRight"));
+  let v = j.vol ? 11 : 4.4;
+  if (k("KeyR")) v *= j.vol ? 2.2 : 1.55;
+  if (nage && !j.vol) v *= .55;
+  if (lire(Math.floor(j.x), Math.floor(j.y + .5), Math.floor(j.z)) === ID.toile && !j.vol) v *= .15;
+  const n = Math.hypot(av, dr) || 1;
+  const tx = (-Math.sin(j.yaw) * av + Math.cos(j.yaw) * dr) / n * v;
+  const tz = (-Math.cos(j.yaw) * av - Math.sin(j.yaw) * dr) / n * v;
+  const r = Math.min(1, dt * (j.sol || j.vol || nage ? 14 : 5));
+  j.vx += (tx - j.vx) * r; j.vz += (tz - j.vz) * r;
+  if (j.vol) { j.vy += ((k("Space") - maj) * 9 - j.vy) * Math.min(1, dt * 10); j.chute = 0; }
+  else if (nage) { j.vy += ((k("Space") ? 3.6 : -2) - j.vy) * Math.min(1, dt * 6); j.chute = 0; }
+  else { j.vy = Math.max(-50, j.vy - 28 * dt); if (k("Space") && j.sol) j.vy = 8.6; }
+
+  if (deplacer("x", j.vx * dt)) { j.vx = 0; if (nage && k("Space")) j.vy = 6; }
+  if (deplacer("z", j.vz * dt)) { j.vz = 0; if (nage && k("Space")) j.vy = 6; }
+  const avantY = j.y, vitesseY = j.vy;
+  const choc = deplacer("y", j.vy * dt);
+  j.sol = choc && vitesseY < 0;
+  if (!j.vol && !nage && j.y < avantY) j.chute += avantY - j.y;
+  if (choc) {
+    j.vy = 0;
+    if (j.sol) {
+      const dessous = BLOCS[lire(Math.floor(j.x), Math.floor(j.y - .1), Math.floor(j.z))];
+      if (dessous.rebond && j.chute > 1 && !maj) j.vy = Math.min(22, -vitesseY * .8);
+      else if (j.chute > 3.5) blesser(Math.floor(j.chute - 3), "Une chute trop haute.");
+      j.chute = 0;
+      if (j.vol) j.vol = false;
+    }
+  }
+  const vit = Math.hypot(j.vx, j.vz);
+  j.marche = vit > .5 ? j.marche + dt * vit * 2 : 0;
+  // Orientation du corps : suit le déplacement en caméra libre
+  j.corps = camera === 3 ? (vit > .5 ? Math.atan2(-j.vx, -j.vz) : j.corps) : j.yaw;
+
+  // Dangers
+  const tete = lire(Math.floor(j.x), Math.floor(j.y + 1.6), Math.floor(j.z));
+  if (tete === ID.eau && mode === "survie") { j.air -= dt; if (j.air <= 0) { j.air = 1; blesser(2, "Tu t'es noyé."); } }
+  else j.air = Math.min(10, j.air + dt * 5);
+  $("eau").style.display = camera === 0 && (tete === ID.eau || tete === ID.lave) ? "block" : "none";
+  $("eau").style.background = tete === ID.lave ? "#e04a00cc" : "#1450c866";
+  minuteur += dt;
+  if (minuteur > .5) {
+    minuteur = 0;
+    let lave = false, pique = false;
+    for (const dx of [-.36, .36]) for (const dz of [-.36, .36]) for (const dy of [-.05, .5, 1.4]) {
+      const b = lire(Math.floor(j.x + dx), Math.floor(j.y + dy), Math.floor(j.z + dz));
+      if (b === ID.lave) lave = true; else if (BLOCS[b].brule) pique = true;
+    }
+    if (lave) blesser(4, "Tu as brûlé dans la lave."); else if (pique) blesser(1, "Un bloc dangereux t'a blessé.");
+  }
+  if (j.y < -20) { if (mode === "survie") blesser(99, "Tu es tombé dans le vide."); else apparaitre(); }
+  if (mode === "survie" && j.vie < 20) { soin += dt; if (soin > 4) { soin = 0; j.vie++; majVie(); } }
+}
+let minuteur = 0, soin = 0;
+
+function blesser(n, cause) {
+  if (mode !== "survie" || joueur.vie <= 0) return;
+  joueur.vie = Math.max(0, joueur.vie - n); soin = 0; majVie();
+  const f = $("flash"); f.style.transition = "none"; f.style.opacity = .45; void f.offsetWidth; f.style.transition = ""; f.style.opacity = 0;
+  if (joueur.vie <= 0) {
+    $("cause").textContent = cause + " Ton inventaire est vidé.";
+    barre = Array(9).fill(null); majBarre();
+    afficher("mort"); document.exitPointerLock?.();
+  }
+}
+function majVie() {
+  if (mode !== "survie") { $("vie").textContent = ""; return; }
+  const v = joueur.vie, pleins = Math.floor(v / 2);
+  $("vie").innerHTML = "❤️".repeat(pleins) + (v % 2 ? "💔" : "") + "🖤".repeat(10 - pleins - (v % 2));
+}
+function apparaitre() {
+  const j = joueur, [x, , z] = depart, cx = Math.floor(x) >> 4, cz = Math.floor(z) >> 4;
+  for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) if (!chunks.has((cx + a) + "," + (cz + b))) genererChunk(cx + a, cz + b);
+  let y = H - 1; while (y > 0 && !BLOCS[lire(Math.floor(x), y, Math.floor(z))].solide) y--;
+  Object.assign(j, { x, y: y + 1.05, z, vx: 0, vy: 0, vz: 0, vie: 20, air: 10, chute: 0 });
+  majVie();
+}
+
+/* ================= ACTIONS ================= */
+function viser() {
+  const o = [joueur.x, joueur.y + 1.62, joueur.z], d = direction(joueur.yaw, joueur.pitch);
+  let c = o.map(Math.floor), prec = null, t = 0;
+  const pas = d.map(v => v > 0 ? 1 : -1), delta = d.map(v => Math.abs(1 / (v || 1e-9)));
+  const prochain = d.map((v, i) => (v > 0 ? c[i] + 1 - o[i] : o[i] - c[i]) * delta[i]);
+  while (t < 6) {
+    const b = lire(c[0], c[1], c[2]);
+    if (b && !BLOCS[b].liquide) return { pos: c.slice(), prec, b };
+    prec = c.slice();
+    const i = prochain[0] < prochain[1] ? (prochain[0] < prochain[2] ? 0 : 2) : (prochain[1] < prochain[2] ? 1 : 2);
+    t = prochain[i]; prochain[i] += delta[i]; c[i] += pas[i];
+  }
+  return null;
+}
+function donner(id) {
+  let i = barre.findIndex(s => s && s.id === id && s.n < 64);
+  if (i < 0) i = barre.findIndex(s => !s);
+  if (i < 0) return message("Inventaire plein !");
+  if (barre[i]) barre[i].n++; else barre[i] = { id, n: 1 };
+  majBarre();
+}
+function casser(c) {
+  const [x, y, z] = c.pos, b = BLOCS[c.b];
+  if (y === 0) return;
+  ecrire(x, y, z, 0);
+  const dessus = BLOCS[lire(x, y + 1, z)];
+  if (dessus.croix) ecrire(x, y + 1, z, 0);
+  if (mode === "survie") donner(b.drop ? ID[b.drop] : c.b);
+}
+function poser() {
+  const c = viser(), s = barre[sel];
+  if (!c || !s) return;
+  let p = BLOCS[c.b].croix && c.b !== ID.torche ? c.pos : c.prec;
+  if (!p || p[1] < 1 || p[1] >= H) return;
+  const ici = BLOCS[lire(...p)], b = BLOCS[s.id];
+  if (!ici.air && !ici.liquide && !ici.croix) return;
+  if (b.croix && !BLOCS[lire(p[0], p[1] - 1, p[2])].solide) return message("Il faut un bloc en dessous.");
+  const ancien = lire(...p);
+  ecrire(p[0], p[1], p[2], s.id, false);
+  if (b.solide && collision(joueur.x, joueur.y, joueur.z)) return ecrire(p[0], p[1], p[2], ancien, false);
+  envoyer({ t: "bloc", x: p[0], y: p[1], z: p[2], b: s.id });
+  if (mode === "survie") { if (--s.n <= 0) barre[sel] = null; majBarre(); }
+}
+function copier() {
+  const c = viser(); if (!c) return;
+  const i = barre.findIndex(s => s && s.id === c.b);
+  if (i >= 0) sel = i;
+  else if (mode === "creatif") barre[sel] = { id: c.b, n: 1 };
+  majBarre();
+}
+function allumer() {
+  const c = viser(); if (!c || c.b !== ID.tnt) return message("Vise un bloc de dynamite.");
+  const [x, y, z] = c.pos; message("Mèche allumée… recule !");
+  const m = chunks;
+  setTimeout(() => { if (m === chunks && enJeu && lire(x, y, z) === ID.tnt) exploser(x, y, z); }, 2000);
+}
+function exploser(x, y, z) {
+  const R = 4, suite = [];
+  ecrire(x, y, z, 0);
+  for (let a = -R; a <= R; a++) for (let b = -R; b <= R; b++) for (let c = -R; c <= R; c++) {
+    if (a * a + b * b + c * c > R * R || y + b < 1) continue;
+    const id = lire(x + a, y + b, z + c);
+    if (id === ID.tnt) suite.push([x + a, y + b, z + c]);
+    else if (id && BLOCS[id].dur < 4 && !BLOCS[id].liquide) ecrire(x + a, y + b, z + c, 0);
+  }
+  const d = Math.hypot(joueur.x - x, joueur.y - y, joueur.z - z);
+  if (d < 7) { blesser(Math.ceil((7 - d) * 3), "Tu as explosé."); joueur.vy = 9; }
+  suite.forEach((p, i) => setTimeout(() => { if (enJeu && lire(...p) === ID.tnt) exploser(...p); }, 250 + i * 80));
+}
+
+/* ================= INTERFACE ================= */
+const icones = [];
+function icone(id) {
+  if (!icones[id]) {
+    const c = document.createElement("canvas"); c.width = c.height = 64;
+    const g = c.getContext("2d"), b = BLOCS[id]; g.imageSmoothingEnabled = false;
+    const src = t => [(t % TUILES) * 16, Math.floor(t / TUILES) * 16, 16, 16];
+    if (b.croix) g.drawImage(atlas, ...src(b.t[1]), 4, 4, 56, 56);
+    else {
+      const face = (t, a, bb, cc, d, e, f, ombre) => { g.setTransform(a, bb, cc, d, e, f); g.drawImage(atlas, ...src(t), 0, 0, 16, 16); if (ombre) { g.globalCompositeOperation = "source-atop"; g.fillStyle = `rgba(0,0,0,${ombre})`; g.fillRect(0, 0, 16, 16); g.globalCompositeOperation = "source-over"; } };
+      const tmp = (t, o) => { const k = document.createElement("canvas"); k.width = k.height = 16; const q = k.getContext("2d"); q.drawImage(atlas, ...src(t), 0, 0, 16, 16); q.globalCompositeOperation = "source-atop"; q.fillStyle = `rgba(0,0,0,${o})`; q.fillRect(0, 0, 16, 16); return k; };
+      g.setTransform(1.75, .875, -1.75, .875, 32, 4); g.drawImage(tmp(b.t[0], 0), 0, 0);
+      g.setTransform(1.75, .875, 0, 2, 4, 18); g.drawImage(tmp(b.t[1], .2), 0, 0);
+      g.setTransform(1.75, -.875, 0, 2, 32, 32); g.drawImage(tmp(b.t[1], .4), 0, 0);
+    }
+    icones[id] = c;
+  }
+  const k = document.createElement("canvas"); k.width = k.height = 64; k.getContext("2d").drawImage(icones[id], 0, 0); return k;
+}
+function caseInv(s, actif, clic) {
+  const d = document.createElement("div"); d.className = "case" + (actif ? " actif" : "");
+  if (s) { d.appendChild(icone(s.id)); d.title = BLOCS[s.id].nom; if (mode === "survie") { const n = document.createElement("span"); n.textContent = s.n; d.appendChild(n); } }
+  d.onclick = clic; return d;
+}
+let nomTimer;
+function majBarre(montrerNom = true) {
+  $("barre").replaceChildren(...barre.map((s, i) => caseInv(s, i === sel, () => { sel = i; majBarre(); })));
+  $("barre2").replaceChildren(...barre.map((s, i) => caseInv(s, i === sel, () => {
+    if (mode === "survie" && i !== sel) { [barre[i], barre[sel]] = [barre[sel], barre[i]]; }
+    sel = i; majBarre();
+  })));
+  $("nom").textContent = montrerNom && barre[sel] ? BLOCS[barre[sel].id].nom : "";
+  clearTimeout(nomTimer); nomTimer = setTimeout(() => $("nom").textContent = "", 1800);
+}
+function majGrille() {
+  const norm = s => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const q = norm($("recherche").value);
+  $("grille").replaceChildren(...BLOCS.map((b, id) => ({ b, id })).filter(o => o.id && norm(o.b.nom).includes(q))
+    .map(o => caseInv({ id: o.id, n: "" }, false, () => { barre[sel] = { id: o.id, n: 1 }; majBarre(); })));
+}
+function ouvrirInventaire() {
+  const cre = mode === "creatif";
+  $("titreInv").textContent = cre ? `Tous les blocs (${BLOCS.length - 1})` : "Mon inventaire";
+  $("recherche").style.display = $("grille").style.display = cre ? "" : "none";
+  $("aideInv").textContent = cre ? "Choisis une case en bas, puis clique sur un bloc pour l'y mettre." : "Clique sur une case pour l'échanger avec la case sélectionnée.";
+  if (cre) majGrille();
+  majBarre(); afficher("inventaire"); document.exitPointerLock?.();
+}
+let msgTimer;
+function message(t, duree = 2500) { $("message").textContent = t; clearTimeout(msgTimer); msgTimer = setTimeout(() => $("message").textContent = "", duree); }
+function afficher(id) {
+  ouvert = id;
+  for (const e of ["menu", "pause", "inventaire", "mort"]) $(e).classList.toggle("visible", e === id);
+  for (const k in touches) touches[k] = false;
+  gauche = false;
+}
+let glisser = false, sansVerrou = false;
+function reprendre() {
+  afficher(null); document.activeElement?.blur();
+  const echec = () => { if (!sansVerrou) { sansVerrou = true; message("Maintiens et glisse la souris pour regarder autour de toi.", 5000); } };
+  try { const p = canvas.requestPointerLock?.(); if (p && p.catch) p.catch(e => { if (e.name === "NotSupportedError" || e.name === "SecurityError" && !document.pointerLockElement) echec(); }); if (!canvas.requestPointerLock) echec(); } catch { echec(); }
+}
+document.addEventListener("pointerlockerror", () => { if (!sansVerrou) { sansVerrou = true; message("Maintiens et glisse la souris pour regarder autour de toi.", 5000); } });
+document.addEventListener("pointerlockchange", () => {
+  if (document.pointerLockElement) sansVerrou = false;
+  else if (enJeu && ouvert === null && !sansVerrou) afficher("pause");
+});
+
+/* ================= COMMANDES ================= */
+let dernierEspace = 0, gauche = false, casse = null, parcouru = 0, attente = 0;
+addEventListener("keydown", e => {
+  if (!enJeu) return;
+  if (e.code === "Escape") { if (ouvert === "inventaire" || ouvert === "pause") reprendre(); else if (ouvert === null) afficher("pause"); return; }
+  if (e.target.tagName === "INPUT") return;
+  if (e.code === "KeyE") { e.preventDefault(); if (ouvert === null) ouvrirInventaire(); else if (ouvert === "inventaire") reprendre(); return; }
+  if (ouvert !== null) return;
+  e.preventDefault();
+  touches[e.code] = true;
+  const n = /^(Digit|Numpad)([1-9])$/.exec(e.code);
+  if (n) { sel = n[2] - 1; majBarre(); }
+  if (e.repeat) return;
+  if (e.code === "Space" && mode === "creatif") {
+    if (performance.now() - dernierEspace < 300) { joueur.vol = !joueur.vol; joueur.vy = 0; message(joueur.vol ? "Vol activé 🕊️" : "Vol désactivé"); dernierEspace = 0; }
+    else dernierEspace = performance.now();
+  }
+  if (e.code === "KeyV") { camera = (camera + 1) % 4; message("Caméra : " + CAMS[camera] + (camera === 3 ? " (molette = zoom)" : "")); }
+  if (e.code === "KeyG") { relief = !relief; message(relief ? "Relief 3D activé : mets des lunettes rouge/cyan" : "Relief 3D désactivé"); }
+  if (e.code === "KeyF") allumer();
+});
+addEventListener("keyup", e => touches[e.code] = false);
+addEventListener("blur", () => { for (const k in touches) touches[k] = false; gauche = false; });
+canvas.addEventListener("mousedown", e => {
+  if (!enJeu || ouvert !== null) return;
+  e.preventDefault();
+  if (!sansVerrou && !document.pointerLockElement) return reprendre();
+  if (sansVerrou) { glisser = true; parcouru = 0; }
+  if (e.button === 0) { gauche = true; attente = sansVerrou ? .25 : 0; }
+  if (e.button === 2 && !sansVerrou) poser();
+  if (e.button === 1) copier();
+});
+addEventListener("mouseup", e => {
+  if (sansVerrou && glisser && parcouru < 6 && ouvert === null) {
+    if (e.button === 2) poser();
+    else if (e.button === 0 && attente > 0 && mode === "creatif") { const c = viser(); if (c) casser(c); }
+  }
+  glisser = false; if (e.button === 0) gauche = false;
+});
+addEventListener("mousemove", e => {
+  if (ouvert !== null || (!document.pointerLockElement && !glisser)) return;
+  parcouru += Math.abs(e.movementX) + Math.abs(e.movementY);
+  if (sansVerrou && parcouru > 6) gauche = false;
+  joueur.yaw -= e.movementX * .0025;
+  joueur.pitch = Math.max(-1.55, Math.min(1.55, joueur.pitch - e.movementY * .0025));
+});
+addEventListener("contextmenu", e => e.preventDefault());
+canvas.addEventListener("wheel", e => {
+  e.preventDefault();
+  if (ouvert !== null) return;
+  if (camera === 3) camDist = Math.max(3, Math.min(30, camDist + Math.sign(e.deltaY)));
+  else { sel = (sel + Math.sign(e.deltaY) + 9) % 9; majBarre(); }
+}, { passive: false });
+$("recherche").addEventListener("input", majGrille);
+
+function miner(dt) {
+  attente -= dt;
+  const c = gauche && ouvert === null ? viser() : null;
+  if (!c || c.pos[1] === 0) { casse = null; $("progres").style.display = "none"; return; }
+  if (mode === "creatif") { if (attente <= 0) { casser(c); attente = .22; } return; }
+  const cle = c.pos.join(",");
+  if (!casse || casse.cle !== cle) casse = { cle, t: 0 };
+  casse.t += dt;
+  const total = BLOCS[c.b].dur * .8;
+  $("progres").style.display = "block"; $("progres").firstChild.style.width = Math.min(100, casse.t / total * 100) + "%";
+  if (casse.t >= total) { casser(c); casse = null; }
+}
+
+/* ================= EN LIGNE (pair à pair) ================= */
+let pair = null, liens = [], estHote = false, codeSalle = "", monId = "hote";
+const autres = new Map();
+const TEINTES = ["#3a86ff", "#8338ec", "#2a9d8f", "#fb8500", "#43aa8b", "#ff006e"];
+function chargerPeer() {
+  if (window.Peer) return Promise.resolve();
+  const charge = src => new Promise((ok, ko) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = () => { s.remove(); ko(); }; document.head.appendChild(s); });
+  return charge("https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js").catch(() => charge("https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"));
+}
+function envoyer(m, sauf) { for (const c of liens) if (c !== sauf && c.open) c.send(m); }
+const entier = (v, a, b) => Number.isInteger(v) && v >= a && v <= b;
+const blocValide = (x, y, z, b) => entier(x, -1e6, 1e6) && entier(y, 1, H - 1) && entier(z, -1e6, 1e6) && entier(b, 0, BLOCS.length - 1);
+function recevoir(m, c) {
+  if (!m || typeof m !== "object") return;
+  if (m.t === "bloc" && blocValide(m.x, m.y, m.z, m.b)) { ecrire(m.x, m.y, m.z, m.b, false); if (estHote) envoyer(m, c); }
+  if (m.t === "pos") {
+    const id = estHote ? c.peer : String(m.id);
+    if (![m.x, m.y, m.z, m.yaw, m.pitch, m.marche].every(Number.isFinite)) return;
+    let a = autres.get(id);
+    if (!a) {
+      if (autres.size >= 12) return;
+      const et = document.createElement("div"); et.className = "etiquette"; $("etiquettes").appendChild(et);
+      a = { et, couleur: TEINTES[autres.size % TEINTES.length] }; autres.set(id, a);
+      message(String(m.nom).slice(0, 16) + " est là !");
+    }
+    Object.assign(a, { x: m.x, y: m.y, z: m.z, yaw: m.yaw, pitch: m.pitch, marche: m.marche });
+    a.et.textContent = String(m.nom).slice(0, 16);
+    if (estHote) envoyer({ ...m, id }, c);
+  }
+  if (m.t === "parti") retirer(String(m.id));
+}
+function retirer(id) { const a = autres.get(id); if (a) { a.et.remove(); autres.delete(id); } }
+function fermerReseau() { const p = pair; pair = null; liens = []; estHote = false; codeSalle = ""; [...autres.keys()].forEach(retirer); p?.destroy(); }
+
+async function heberger() {
+  fermerReseau(); $("etat").textContent = "Connexion au serveur…";
+  try { await chargerPeer(); } catch { return $("etat").textContent = "Impossible de charger le module en ligne. Vérifie ta connexion internet."; }
+  const code = Array.from({ length: 6 }, () => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.random() * 32 | 0]).join("");
+  const p = pair = new Peer("cubimonde-" + code);
+  p.on("open", () => { if (p !== pair) return; estHote = true; codeSalle = code; lancer((Math.random() * 1e9) | 0, choix.monde); message("Code de la partie : " + code + " (aussi dans le menu pause)", 8000); });
+  p.on("connection", c => {
+    c.on("open", () => {
+      if (liens.length >= 7) return c.close();
+      liens.push(c);
+      c.send({ t: "monde", seed, type: typeMonde, modifs: [...modifs].map(([k, m]) => [k, [...m]]) });
+    });
+    c.on("data", m => { if (liens.includes(c)) recevoir(m, c); });
+    c.on("close", () => { liens = liens.filter(l => l !== c); retirer(c.peer); envoyer({ t: "parti", id: c.peer }); });
+  });
+  p.on("error", e => { if (p !== pair) return; const t = "Erreur en ligne : " + e.type; $("etat").textContent = t; message(t); });
+}
+async function rejoindre() {
+  const code = $("code").value.trim().toUpperCase();
+  if (code.length !== 6) return $("etat").textContent = "Entre le code à 6 caractères.";
+  fermerReseau(); $("etat").textContent = "Recherche de la partie…";
+  try { await chargerPeer(); } catch { return $("etat").textContent = "Impossible de charger le module en ligne. Vérifie ta connexion internet."; }
+  const p = pair = new Peer();
+  const delai = setTimeout(() => { if (p === pair && !enJeu) { fermerReseau(); $("etat").textContent = "Connexion impossible. Vérifie le code ou le réseau."; } }, 15000);
+  p.on("open", id => {
+    monId = id;
+    const c = p.connect("cubimonde-" + code, { reliable: true });
+    c.on("data", m => {
+      if (p !== pair) return;
+      if (m.t === "monde") {
+        clearTimeout(delai); liens = [c]; codeSalle = code;
+        const recues = new Map(m.modifs.map(([k, l]) => [k, new Map(l)]));
+        lancer(m.seed | 0, m.type === "plat" ? "plat" : "normal", recues);
+      } else recevoir(m, c);
+    });
+    c.on("close", () => { if (p === pair) { quitter(); $("etat").textContent = "L'hôte a quitté la partie."; } });
+  });
+  p.on("error", e => { if (p !== pair) return; clearTimeout(delai); $("etat").textContent = e.type === "peer-unavailable" ? "Aucune partie avec ce code." : "Erreur en ligne : " + e.type; });
+}
+setInterval(() => {
+  if (enJeu && liens.length) envoyer({ t: "pos", id: estHote ? "hote" : monId, nom: $("pseudo").value.trim() || "Joueur", x: joueur.x, y: joueur.y, z: joueur.z, yaw: joueur.corps, pitch: joueur.pitch, marche: joueur.marche });
+}, 80);
+
+/* ================= PARTIE ================= */
+const choix = { monde: "normal", mode: "creatif" };
+document.querySelectorAll("[data-groupe]").forEach(g => g.addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  g.querySelectorAll("button").forEach(x => x.classList.toggle("actif", x === b));
+  choix[g.dataset.groupe] = b.dataset.v;
+}));
+function definirMode(m) {
+  mode = m; joueur.vie = 20; joueur.air = 10; joueur.chute = 0;
+  if (m === "survie") { joueur.vol = false; barre = Array(9).fill(null); }
+  else barre = ["herbe", "pierre", "planches_chene", "buche_chene", "verre", "briques", "laine_rouge", "torche", "tnt"].map(c => ({ id: ID[c], n: 1 }));
+  majVie(); majBarre();
+}
+function viderMonde() { for (const c of chunks.values()) c.mailles?.forEach(m => m && gl.deleteBuffer(m.buf)); chunks = new Map(); modifs = new Map(); }
+function lancer(s, type, recues) {
+  viderMonde(); seed = s; typeMonde = type; if (recues) modifs = recues;
+  // Cherche un point de départ au sec
+  let x = 0; if (type === "normal") for (let i = 0; i < 400; i++) { const h = terrain(i * 8, 0).h; if (h > MER + 1 && h < 55) { x = i * 8; break; } }
+  depart = [x + .5, 0, .5];
+  Object.assign(joueur, { yaw: 0, pitch: -.15, vol: false });
+  camera = 0; sel = 0; temps = 60; enJeu = true; $("etat").textContent = "";
+  definirMode(choix.mode); apparaitre();
+  $("hud").style.display = "block"; reprendre();
+}
+function quitter() {
+  enJeu = false; fermerReseau(); viderMonde(); $("hud").style.display = "none"; afficher("menu"); document.exitPointerLock?.();
+}
+$("solo").onclick = () => { fermerReseau(); lancer((Math.random() * 1e9) | 0, choix.monde); };
+$("heberger").onclick = heberger;
+$("rejoindre").onclick = rejoindre;
+$("reprendre").onclick = reprendre;
+$("fermerInv").onclick = reprendre;
+$("quitter").onclick = quitter;
+$("changerMode").onclick = () => { definirMode(mode === "creatif" ? "survie" : "creatif"); reprendre(); message("Mode " + (mode === "creatif" ? "créatif" : "survie")); };
+$("renaitre").onclick = () => { apparaitre(); reprendre(); };
+new MutationObserver(() => {
+  $("codePartie").textContent = codeSalle ? "Code de la partie : " + codeSalle : "";
+  $("changerMode").textContent = mode === "creatif" ? "Passer en survie" : "Passer en créatif";
+}).observe($("pause"), { attributes: true });
+
+/* ================= BOUCLE ================= */
+const DIST = 6;
+const ordre = [];
+for (let a = -DIST - 1; a <= DIST + 1; a++) for (let b = -DIST - 1; b <= DIST + 1; b++) ordre.push([a, b]);
+ordre.sort((p, q) => p[0] ** 2 + p[1] ** 2 - q[0] ** 2 - q[1] ** 2);
+function charger() {
+  const cx = Math.floor(joueur.x) >> 4, cz = Math.floor(joueur.z) >> 4, debut = performance.now();
+  for (const c of chunks.values()) {
+    if (c.urgent) construire(c);
+    if (Math.max(Math.abs(c.cx - cx), Math.abs(c.cz - cz)) > DIST + 3) { c.mailles?.forEach(m => m && gl.deleteBuffer(m.buf)); chunks.delete(c.cx + "," + c.cz); }
+  }
+  for (const [a, b] of ordre) {
+    if (performance.now() - debut > 9) break;
+    if (Math.max(Math.abs(a), Math.abs(b)) > DIST) continue;
+    const x = cx + a, z = cz + b, c = chunks.get(x + "," + z);
+    if (c && !c.sale) continue;
+    for (let i = -1; i <= 1; i++) for (let k = -1; k <= 1; k++) if (!chunks.has((x + i) + "," + (z + k))) genererChunk(x + i, z + k);
+    construire(chunks.get(x + "," + z));
+  }
+}
+
+function rendre() {
+  const j = joueur, w = canvas.clientWidth, h = canvas.clientHeight;
+  if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+  gl.viewport(0, 0, w, h);
+  const soleil = Math.sin(temps / 600 * Math.PI * 2);   // cycle jour / nuit de 10 min
+  const jour = Math.max(.35, Math.min(1, .75 + soleil * .6));
+  const ciel = [mix(.03, .55, (jour - .35) / .65), mix(.05, .76, (jour - .35) / .65), mix(.12, 1, (jour - .35) / .65)];
+  gl.clearColor(...ciel, 1);
+  gl.enable(gl.DEPTH_TEST); gl.enable(gl.CULL_FACE);
+  gl.colorMask(true, true, true, true);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.uniform3fv(U.ciel, ciel); gl.uniform1f(U.jour, jour); gl.uniform1f(U.loin, DIST * T);
+
+  // Position de la caméra
+  const oeil = [j.x, j.y + 1.62, j.z];
+  let yaw = j.yaw, pitch = j.pitch, cam = oeil.slice();
+  if (camera) {
+    if (camera === 2) { yaw += Math.PI; pitch = -pitch; }
+    const d = direction(yaw, pitch), max = camera === 3 ? camDist : 4.5;
+    let l = 0;
+    while (l < max) { const t = l + .1; if (BLOCS[lire(...oeil.map((v, i) => Math.floor(v - d[i] * (t + .2))))].opaque && lire(...oeil.map((v, i) => Math.floor(v - d[i] * (t + .2))))) break; l = t; }
+    cam = oeil.map((v, i) => v - d[i] * l);
+  }
+  const proj = perspective(1.25, w / h, .08, 400);
+  const rendus = relief ? [[-.06, [true, false, false]], [.06, [false, true, true]]] : [[0, [true, true, true]]];
+  const cible = viser();
+  let vpCentre;
+  for (const [ecart, masque] of rendus) {
+    gl.colorMask(...masque, true);
+    gl.clear(gl.DEPTH_BUFFER_BIT);
+    const vue = mul(trans(-ecart, 0, 0), mul(rotX(-pitch), mul(rotY(-yaw), trans(-cam[0], -cam[1], -cam[2]))));
+    const vp = mul(proj, vue); vpCentre = vp;
+    gl.uniformMatrix4fv(U.vp, false, vp);
+    gl.uniform4f(U.teinte, 0, 0, 0, 0);
+    for (const c of chunks.values()) if (c.mailles) dessiner(c.mailles[0]);
+    // Personnages
+    gl.disable(gl.CULL_FACE);
+    if (camera) personnage({ ...j, yaw: j.corps });
+    for (const a of autres.values()) personnage(a);
+    if (cible) { couleur("#000000"); dessiner(lignes, trans(...cible.pos)); }
+    // Soleil
+    const ang = temps / 600 * Math.PI * 2;
+    couleur(soleil > -.1 ? "#fff3a0" : "#dfe6ff");
+    const s = soleil > -.1 ? 1 : -1;
+    gl.uniform1f(U.loin, 1e5); gl.uniform1f(U.jour, 1.4);
+    dessiner(cube1, mul(trans(cam[0] + Math.cos(ang) * 150 * s, cam[1] + Math.sin(ang) * 150 * s, cam[2] - 60), echelle(10, 10, 10)));
+    gl.uniform1f(U.loin, DIST * T); gl.uniform1f(U.jour, jour);
+    // Eau et verres teintés, du plus loin au plus proche
+    gl.uniform4f(U.teinte, 0, 0, 0, 0);
+    gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
+    [...chunks.values()].filter(c => c.mailles && c.mailles[1])
+      .sort((a, b) => Math.hypot(b.cx * T + 8 - cam[0], b.cz * T + 8 - cam[2]) - Math.hypot(a.cx * T + 8 - cam[0], a.cz * T + 8 - cam[2]))
+      .forEach(c => dessiner(c.mailles[1]));
+    gl.depthMask(true); gl.disable(gl.BLEND); gl.enable(gl.CULL_FACE);
+  }
+  // Pseudos des autres joueurs
+  for (const a of autres.values()) {
+    const m = vpCentre, p = [a.x, a.y + 2.2, a.z, 1], q = [0, 1, 2, 3].map(l => m[l] * p[0] + m[4 + l] * p[1] + m[8 + l] * p[2] + m[12 + l]);
+    a.et.style.display = q[3] > 0 ? "" : "none";
+    a.et.style.left = (q[0] / q[3] + 1) / 2 * w + "px"; a.et.style.top = (1 - q[1] / q[3]) / 2 * h + "px";
+  }
+}
+
+let avant = performance.now(), images = 0, cumul = 0, ips = 0;
+function boucle(t) {
+  const dt = Math.min(.05, (t - avant) / 1000); avant = t;
+  if (enJeu) {
+    const seul = !liens.length && !estHote;
+    if (ouvert === null || !seul) { temps += dt; if (ouvert !== "mort") physique(dt); miner(dt); }
+    charger(); rendre();
+    images++; cumul += dt;
+    if (cumul > .5) { ips = Math.round(images / cumul); images = cumul = 0; }
+    $("infos").textContent = `${mode === "creatif" ? "Créatif" : "Survie"}${joueur.vol ? " (vol)" : ""} · ${CAMS[camera]}\nX ${Math.floor(joueur.x)}  Y ${Math.floor(joueur.y)}  Z ${Math.floor(joueur.z)}\n${ips} images/s${codeSalle ? "\nCode : " + codeSalle + " · " + (autres.size + 1) + " joueur(s)" : ""}`;
+    $("air").textContent = mode === "survie" && joueur.air < 9.9 ? "🫧".repeat(Math.ceil(joueur.air)) : "";
+  }
+  requestAnimationFrame(boucle);
+}
+requestAnimationFrame(boucle);
+</script>
+</body>
+</html>
